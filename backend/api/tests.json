@@ -1,0 +1,39 @@
+{
+  "tests": [
+    {
+      "name": "GET settings",
+      "method": "GET",
+      "path": "/",
+      "expectedStatus": 200,
+      "expectedBody": {"ok": true},
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "GET announcements",
+      "method": "POST",
+      "path": "/",
+      "body": {"action": "get_announcements"},
+      "expectedStatus": 200,
+      "expectedBody": {"ok": true},
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Admin login wrong password",
+      "method": "POST",
+      "path": "/",
+      "body": {"action": "login", "password": "wrongpass"},
+      "expectedStatus": 401,
+      "expectedBody": {"ok": false},
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Admin login correct password",
+      "method": "POST",
+      "path": "/",
+      "body": {"action": "login", "password": "admin123"},
+      "expectedStatus": 200,
+      "expectedBody": {"ok": true},
+      "bodyMatcher": "partial"
+    }
+  ]
+}

@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Icon from "@/components/ui/icon";
+import { getPhotos, isAdmin, uploadPhoto, deletePhoto } from "@/lib/api";
 
 const classes = ["5А", "5Б", "6А", "6Б", "7А", "7Б", "8А", "8Б", "9А", "9Б", "10А", "11А"];
 const days = ["Понедельник", "Вторник", "Среда", "Четверг", "Пятница"];
@@ -65,24 +66,52 @@ const defaultDay = todayIndex >= 0 && todayIndex < 5 ? days[todayIndex] : days[0
 
 type ViewMode = "list" | "photo";
 
+interface SchedulePhoto {
+  id: number;
+  class_name: string | null;
+  filename: string;
+  url: string;
+  uploaded_at: string;
+}
+
 export default function SchedulePage() {
   const [selectedClass, setSelectedClass] = useState("5А");
   const [selectedDay, setSelectedDay] = useState(defaultDay);
   const [viewMode, setViewMode] = useState<ViewMode>("list");
-  const [uploadedPhoto, setUploadedPhoto] = useState<string | null>(null);
+  const [photos, setPhotos] = useState<SchedulePhoto[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const adminMode = isAdmin();
+
+  useEffect(() => {
+    getPhotos().then((res) => {
+      if (res.ok && res.photos) setPhotos(res.photos);
+    });
+  }, []);
 
   const currentSchedule = scheduleData[selectedClass]?.[selectedDay] ?? [];
   const getColor = (subject: string) =>
     subjectColors[subject] || "bg-white/10 text-white/70 border-white/20";
 
-  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      setUploadedPhoto(ev.target?.result as string);
-    };
-    reader.readAsDataURL(file);
+    setUploading(true);
+    setUploadError(null);
+    const res = await uploadPhoto(file);
+    if (res.ok && res.url) {
+      const updated = await getPhotos();
+      if (updated.ok) setPhotos(updated.photos);
+    } else {
+      setUploadError(res.error || "Ошибка загрузки");
+    }
+    setUploading(false);
+    e.target.value = "";
+  };
+
+  const handleDeletePhoto = async (id: number) => {
+    await deletePhoto(id);
+    setPhotos((prev) => prev.filter((p) => p.id !== id));
   };
 
   return (
@@ -133,69 +162,94 @@ export default function SchedulePage() {
         {/* Photo mode */}
         {viewMode === "photo" && (
           <div className="animate-slide-up space-y-4">
-            <div className="glass rounded-2xl p-6">
-              <h3 className="font-display text-xl font-bold text-white tracking-wide mb-1">
-                ОБЩЕЕ РАСПИСАНИЕ (ФОТО)
-              </h3>
-              <p className="text-white/45 text-sm mb-6">
-                Загрузите фотографию или скан расписания — оно будет видно всем ученикам
-              </p>
 
-              {uploadedPhoto ? (
-                <div className="space-y-4">
-                  <div className="rounded-2xl overflow-hidden border border-white/10">
-                    <img
-                      src={uploadedPhoto}
-                      alt="Расписание"
-                      className="w-full object-contain max-h-[70vh]"
-                    />
-                  </div>
-                  <div className="flex gap-3">
-                    <label className="cursor-pointer flex items-center gap-2 px-4 py-2.5 rounded-xl bg-purple-500/20 text-purple-400 border border-purple-500/30 text-sm font-medium hover:bg-purple-500/30 transition-all">
-                      <input
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        onChange={handlePhotoUpload}
-                      />
-                      <Icon name="RefreshCw" size={14} />
-                      Заменить фото
-                    </label>
-                    <button
-                      onClick={() => setUploadedPhoto(null)}
-                      className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-red-500/20 text-red-400 border border-red-500/30 text-sm font-medium hover:bg-red-500/30 transition-all"
-                    >
-                      <Icon name="Trash2" size={14} />
-                      Удалить
-                    </button>
-                  </div>
-                </div>
-              ) : (
+            {/* Upload block — только для админа */}
+            {adminMode && (
+              <div className="glass rounded-2xl p-6 border border-purple-500/20">
+                <h3 className="font-display text-xl font-bold text-white tracking-wide mb-1">
+                  ЗАГРУЗИТЬ РАСПИСАНИЕ
+                </h3>
+                <p className="text-white/45 text-sm mb-5">Фото сохранится и будет видно всем ученикам</p>
                 <label className="cursor-pointer block">
                   <input
                     type="file"
                     accept="image/*"
                     className="hidden"
                     onChange={handlePhotoUpload}
+                    disabled={uploading}
                   />
-                  <div className="border-2 border-dashed border-white/15 rounded-2xl p-12 text-center hover:border-purple-500/50 hover:bg-purple-500/5 transition-all group">
-                    <div className="w-16 h-16 rounded-2xl bg-purple-500/15 flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform">
-                      <Icon name="ImagePlus" size={28} className="text-purple-400" />
+                  <div className={`border-2 border-dashed rounded-2xl p-8 text-center transition-all group ${
+                    uploading
+                      ? "border-purple-500/30 bg-purple-500/5"
+                      : "border-white/15 hover:border-purple-500/50 hover:bg-purple-500/5 cursor-pointer"
+                  }`}>
+                    <div className="w-12 h-12 rounded-2xl bg-purple-500/15 flex items-center justify-center mx-auto mb-3 group-hover:scale-110 transition-transform">
+                      <Icon name={uploading ? "Loader" : "ImagePlus"} size={22} className={`text-purple-400 ${uploading ? "animate-spin" : ""}`} />
                     </div>
-                    <p className="text-white/60 font-semibold mb-1">Нажмите, чтобы загрузить фото</p>
-                    <p className="text-white/30 text-sm">JPG, PNG, WEBP — до 10 МБ</p>
+                    <p className="text-white/60 font-semibold text-sm">
+                      {uploading ? "Загружаю..." : "Нажмите, чтобы добавить фото"}
+                    </p>
+                    <p className="text-white/30 text-xs mt-1">JPG, PNG, WEBP</p>
                   </div>
                 </label>
-              )}
-            </div>
+                {uploadError && (
+                  <p className="text-red-400 text-sm mt-2 flex items-center gap-1">
+                    <Icon name="AlertCircle" size={14} />
+                    {uploadError}
+                  </p>
+                )}
+              </div>
+            )}
 
-            <div className="glass rounded-2xl p-4 flex items-center gap-3">
-              <Icon name="Info" size={16} className="text-cyan-400 flex-shrink-0" />
-              <p className="text-white/50 text-sm">
-                Это общее расписание видно всем посетителям сайта. Для загрузки файлов Excel используйте{" "}
-                <span className="text-purple-400">Админ-панель → Расписание</span>
-              </p>
-            </div>
+            {/* Photos list */}
+            {photos.length > 0 ? (
+              <div className="space-y-4">
+                {photos.map((photo) => (
+                  <div key={photo.id} className="glass rounded-2xl overflow-hidden">
+                    <img
+                      src={photo.url}
+                      alt={photo.filename}
+                      className="w-full object-contain max-h-[80vh]"
+                    />
+                    <div className="p-4 flex items-center justify-between">
+                      <div>
+                        <p className="text-white/60 text-sm">{photo.filename}</p>
+                        <p className="text-white/30 text-xs">
+                          {new Date(photo.uploaded_at).toLocaleDateString("ru-RU")}
+                        </p>
+                      </div>
+                      {adminMode && (
+                        <button
+                          onClick={() => handleDeletePhoto(photo.id)}
+                          className="flex items-center gap-2 px-3 py-2 rounded-xl bg-red-500/20 text-red-400 border border-red-500/30 text-sm hover:bg-red-500/30 transition-all"
+                        >
+                          <Icon name="Trash2" size={14} />
+                          Удалить
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="glass rounded-2xl p-12 text-center">
+                <Icon name="ImageOff" size={40} className="text-white/20 mx-auto mb-3" />
+                <p className="text-white/40 text-sm">Фото расписания ещё не загружено</p>
+                {!adminMode && (
+                  <p className="text-white/25 text-xs mt-1">Обратитесь к администратору</p>
+                )}
+              </div>
+            )}
+
+            {!adminMode && (
+              <div className="glass rounded-2xl p-4 flex items-center gap-3">
+                <Icon name="Info" size={16} className="text-cyan-400 flex-shrink-0" />
+                <p className="text-white/50 text-sm">
+                  Фото загружает администратор через{" "}
+                  <span className="text-purple-400">Админ-панель → Расписание</span>
+                </p>
+              </div>
+            )}
           </div>
         )}
 

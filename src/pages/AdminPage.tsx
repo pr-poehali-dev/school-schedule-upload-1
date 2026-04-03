@@ -1,134 +1,179 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Icon from "@/components/ui/icon";
+import {
+  login, setToken, removeToken, getToken, getSettings, saveSettings,
+  getAnnouncements, updateAnnouncementStatus, deleteAnnouncement, createAnnouncement,
+  getPhotos, uploadPhoto, deletePhoto,
+} from "@/lib/api";
 
-const ADMIN_PASSWORD = "admin123";
-
-interface PendingAnnouncement {
+interface Announcement {
   id: number;
   title: string;
   content: string;
   author: string;
-  date: string;
+  category: string;
+  pinned: boolean;
   status: "pending" | "approved" | "rejected";
+  created_at: string;
 }
 
-interface User {
+interface SchedulePhoto {
   id: number;
-  name: string;
-  email: string;
-  role: "admin" | "teacher" | "student" | "parent";
-  active: boolean;
+  class_name: string | null;
+  filename: string;
+  url: string;
+  uploaded_at: string;
 }
 
-const initialAnnouncements: PendingAnnouncement[] = [
-  {
-    id: 1,
-    title: "Конкурс чтецов — запись участников",
-    content: "Объявляется набор участников на школьный конкурс чтецов «Живое слово». Регистрация до 15 апреля.",
-    author: "Смирнова Т.В.",
-    date: "03.04.2026",
-    status: "pending",
-  },
-  {
-    id: 2,
-    title: "Субботник — перенос даты",
-    content: "В связи с прогнозируемыми осадками субботник переносится с 19 на 26 апреля.",
-    author: "Федорова О.И.",
-    date: "02.04.2026",
-    status: "pending",
-  },
-  {
-    id: 3,
-    title: "Экскурсия в музей для 8 классов",
-    content: "11 апреля запланирована экскурсия в Исторический музей. Стоимость: 350 рублей. Сбор у входа в 09:30.",
-    author: "Петрова Н.С.",
-    date: "01.04.2026",
-    status: "pending",
-  },
-];
-
-const initialUsers: User[] = [
-  { id: 1, name: "Александрова М.В.", email: "director@school.ru", role: "admin", active: true },
-  { id: 2, name: "Иванова А.П.", email: "ivanova@school.ru", role: "teacher", active: true },
-  { id: 3, name: "Смирнова Т.В.", email: "smirnova@school.ru", role: "teacher", active: true },
-  { id: 4, name: "Козлов Д.И.", email: "kozlov@school.ru", role: "teacher", active: true },
-  { id: 5, name: "Петров А.Д.", email: "petrov_student@school.ru", role: "student", active: false },
-  { id: 6, name: "Захаров В.Н.", email: "zakharov@school.ru", role: "parent", active: true },
-];
-
-const roleLabels: Record<User["role"], string> = {
-  admin: "Администратор",
-  teacher: "Учитель",
-  student: "Ученик",
-  parent: "Родитель",
-};
-
-const roleColors: Record<User["role"], string> = {
+const roleColors: Record<string, string> = {
   admin: "bg-purple-500/20 text-purple-300 border-purple-500/30",
   teacher: "bg-blue-500/20 text-blue-300 border-blue-500/30",
   student: "bg-green-500/20 text-green-300 border-green-500/30",
   parent: "bg-amber-500/20 text-amber-300 border-amber-500/30",
 };
 
-type AdminTab = "overview" | "announcements" | "schedule" | "users" | "settings";
+type AdminTab = "overview" | "announcements" | "schedule" | "settings";
 
 export default function AdminPage() {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(() => {
+    const t = getToken();
+    return !!t && t.startsWith("admin-token-");
+  });
   const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
+  const [loginError, setLoginError] = useState("");
+  const [loginLoading, setLoginLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<AdminTab>("overview");
-  const [announcements, setAnnouncements] = useState(initialAnnouncements);
-  const [users, setUsers] = useState(initialUsers);
-  const [scheduleFile, setScheduleFile] = useState<string | null>(null);
 
-  const [siteSettings, setSiteSettings] = useState({
-    siteName: "Расписание уроков школа №4",
-    siteSubtitle: "2025–2026 учебный год",
-    telegramLink: "https://t.me/Schedule_Lessons4_LSK",
-    telegramAdmin: "@Germann12_21",
-    schoolAddress: "г. Москва, ул. Школьная, д. 1",
-    schoolPhone: "+7 (495) 123-45-67",
-    schoolEmail: "school@example.edu.ru",
-    tickerText: "📣 Завтра, 4 апреля — родительское собрание в 18:00 · 🏆 Олимпиада по математике — 10 апреля · 🎨 Выставка рисунков в актовом зале",
-    adminPassword: "admin123",
-    showSchedulePhoto: true,
-    showAnnouncements: true,
-    showContacts: true,
+  // Announcements
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const [annLoading, setAnnLoading] = useState(false);
+  const [newAnn, setNewAnn] = useState({ title: "", content: "", author: "Администрация", category: "admin", pinned: false });
+  const [showNewAnn, setShowNewAnn] = useState(false);
+  const [annSaving, setAnnSaving] = useState(false);
+
+  // Schedule photos
+  const [photos, setPhotos] = useState<SchedulePhoto[]>([]);
+  const [photoUploading, setPhotoUploading] = useState(false);
+  const [photoError, setPhotoError] = useState<string | null>(null);
+
+  // Settings
+  const [settings, setSettings] = useState<Record<string, string>>({
+    site_name: "Расписание уроков школа №4",
+    site_subtitle: "2025–2026 учебный год",
+    telegram_link: "https://t.me/Schedule_Lessons4_LSK",
+    telegram_admin: "@Germann12_21",
+    school_address: "г. Москва, ул. Школьная, д. 1",
+    school_phone: "+7 (495) 123-45-67",
+    school_email: "school@example.edu.ru",
+    ticker_text: "",
+    admin_password: "",
   });
   const [settingsSaved, setSettingsSaved] = useState(false);
+  const [settingsSaving, setSettingsSaving] = useState(false);
 
-  const handleSaveSettings = () => {
-    setSettingsSaved(true);
-    setTimeout(() => setSettingsSaved(false), 2500);
+  // Load data when logged in
+  useEffect(() => {
+    if (!isLoggedIn) return;
+    loadAnnouncements();
+    loadPhotos();
+    loadSettings();
+  }, [isLoggedIn]);
+
+  const loadAnnouncements = async () => {
+    setAnnLoading(true);
+    const res = await getAnnouncements(true);
+    if (res.ok) setAnnouncements(res.announcements || []);
+    setAnnLoading(false);
   };
 
-  const handleLogin = () => {
-    if (password === ADMIN_PASSWORD) {
-      setIsLoggedIn(true);
-      setError("");
-    } else {
-      setError("Неверный пароль. Попробуйте ещё раз.");
+  const loadPhotos = async () => {
+    const res = await getPhotos();
+    if (res.ok) setPhotos(res.photos || []);
+  };
+
+  const loadSettings = async () => {
+    const res = await getSettings();
+    if (res.ok && res.settings) {
+      setSettings((prev) => ({ ...prev, ...res.settings, admin_password: "" }));
     }
   };
 
-  const handleAnnouncement = (id: number, action: "approved" | "rejected") => {
+  const handleLogin = async () => {
+    setLoginLoading(true);
+    setLoginError("");
+    const res = await login(password);
+    if (res.ok && res.token) {
+      setToken(res.token);
+      setIsLoggedIn(true);
+    } else {
+      setLoginError(res.error || "Неверный пароль. Попробуйте ещё раз.");
+    }
+    setLoginLoading(false);
+  };
+
+  const handleLogout = () => {
+    removeToken();
+    setIsLoggedIn(false);
+    setPassword("");
+  };
+
+  const handleAnnouncementAction = async (id: number, action: "approved" | "rejected") => {
+    await updateAnnouncementStatus(id, action);
     setAnnouncements((prev) =>
       prev.map((a) => (a.id === id ? { ...a, status: action } : a))
     );
   };
 
-  const toggleUserActive = (id: number) => {
-    setUsers((prev) =>
-      prev.map((u) => (u.id === id ? { ...u, active: !u.active } : u))
-    );
+  const handleDeleteAnnouncement = async (id: number) => {
+    await deleteAnnouncement(id);
+    setAnnouncements((prev) => prev.filter((a) => a.id !== id));
   };
 
-  const changeUserRole = (id: number, role: User["role"]) => {
-    setUsers((prev) => prev.map((u) => (u.id === id ? { ...u, role } : u)));
+  const handleCreateAnnouncement = async () => {
+    if (!newAnn.title.trim() || !newAnn.content.trim()) return;
+    setAnnSaving(true);
+    const res = await createAnnouncement(newAnn);
+    if (res.ok) {
+      await loadAnnouncements();
+      setNewAnn({ title: "", content: "", author: "Администрация", category: "admin", pinned: false });
+      setShowNewAnn(false);
+    }
+    setAnnSaving(false);
+  };
+
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setPhotoUploading(true);
+    setPhotoError(null);
+    const res = await uploadPhoto(file);
+    if (res.ok) {
+      await loadPhotos();
+    } else {
+      setPhotoError(res.error || "Ошибка загрузки");
+    }
+    setPhotoUploading(false);
+    e.target.value = "";
+  };
+
+  const handleDeletePhoto = async (id: number) => {
+    await deletePhoto(id);
+    setPhotos((prev) => prev.filter((p) => p.id !== id));
+  };
+
+  const handleSaveSettings = async () => {
+    setSettingsSaving(true);
+    const payload: Record<string, string | boolean> = { ...settings };
+    if (!payload.admin_password) delete payload.admin_password;
+    await saveSettings(payload);
+    setSettingsSaved(true);
+    setSettingsSaving(false);
+    setTimeout(() => setSettingsSaved(false), 2500);
   };
 
   const pendingCount = announcements.filter((a) => a.status === "pending").length;
 
+  // ── LOGIN SCREEN ──────────────────────────────────────
   if (!isLoggedIn) {
     return (
       <div className="min-h-screen bg-background bg-grid pt-24 pb-16 flex items-center justify-center px-4">
@@ -138,12 +183,9 @@ export default function AdminPage() {
               <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-pink-600 to-rose-600 flex items-center justify-center mx-auto mb-4 glow-pink">
                 <Icon name="Shield" size={28} className="text-white" />
               </div>
-              <h1 className="font-display text-3xl font-bold text-white tracking-wide mb-1">
-                АДМИН-ПАНЕЛЬ
-              </h1>
+              <h1 className="font-display text-3xl font-bold text-white tracking-wide mb-1">АДМИН-ПАНЕЛЬ</h1>
               <p className="text-white/40 text-sm">Доступ только для администраторов</p>
             </div>
-
             <div className="space-y-4">
               <div>
                 <label className="text-white/60 text-sm mb-2 block">Пароль администратора</label>
@@ -153,26 +195,23 @@ export default function AdminPage() {
                   onChange={(e) => setPassword(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && handleLogin()}
                   placeholder="Введите пароль..."
-                  className="w-full bg-white/5 border border-white/15 rounded-xl px-4 py-3 text-white placeholder-white/25 focus:outline-none focus:border-pink-500/60 focus:bg-white/8 transition-all text-sm"
+                  className="w-full bg-white/5 border border-white/15 rounded-xl px-4 py-3 text-white placeholder-white/25 focus:outline-none focus:border-pink-500/60 transition-all text-sm"
                 />
-                {error && (
+                {loginError && (
                   <p className="text-red-400 text-xs mt-2 flex items-center gap-1 animate-fade-in">
                     <Icon name="AlertCircle" size={12} />
-                    {error}
+                    {loginError}
                   </p>
                 )}
               </div>
               <button
                 onClick={handleLogin}
-                className="w-full py-3 rounded-xl bg-gradient-to-r from-pink-600 to-rose-600 text-white font-semibold hover:opacity-90 transition-all hover:scale-105 glow-pink"
+                disabled={loginLoading}
+                className="w-full py-3 rounded-xl bg-gradient-to-r from-pink-600 to-rose-600 text-white font-semibold hover:opacity-90 transition-all hover:scale-105 glow-pink disabled:opacity-50 disabled:scale-100"
               >
-                Войти в панель
+                {loginLoading ? "Проверяю..." : "Войти в панель"}
               </button>
             </div>
-
-            <p className="text-center text-white/25 text-xs mt-6">
-              Демо-пароль: <code className="text-pink-400/70">admin123</code>
-            </p>
           </div>
         </div>
       </div>
@@ -183,13 +222,13 @@ export default function AdminPage() {
     { id: "overview", label: "Обзор", icon: "LayoutDashboard" },
     { id: "announcements", label: "Объявления", icon: "Bell", badge: pendingCount },
     { id: "schedule", label: "Расписание", icon: "CalendarDays" },
-    { id: "users", label: "Пользователи", icon: "Users" },
     { id: "settings", label: "Настройки", icon: "Settings" },
   ];
 
   return (
     <div className="min-h-screen bg-background bg-grid pt-24 pb-16">
       <div className="max-w-6xl mx-auto px-4">
+
         {/* Header */}
         <div className="flex items-center justify-between mb-8 animate-slide-up">
           <div className="flex items-center gap-3">
@@ -197,14 +236,12 @@ export default function AdminPage() {
               <Icon name="Shield" size={20} className="text-white" />
             </div>
             <div>
-              <h1 className="font-display text-3xl font-bold text-white tracking-wide">
-                АДМИН-ПАНЕЛЬ
-              </h1>
+              <h1 className="font-display text-3xl font-bold text-white tracking-wide">АДМИН-ПАНЕЛЬ</h1>
               <p className="text-white/40 text-xs">Добро пожаловать, Администратор</p>
             </div>
           </div>
           <button
-            onClick={() => setIsLoggedIn(false)}
+            onClick={handleLogout}
             className="flex items-center gap-2 px-4 py-2 rounded-xl glass border border-white/10 text-white/60 hover:text-white hover:border-white/25 text-sm transition-all"
           >
             <Icon name="LogOut" size={14} />
@@ -235,15 +272,14 @@ export default function AdminPage() {
           ))}
         </div>
 
-        {/* Overview */}
+        {/* ── OVERVIEW ── */}
         {activeTab === "overview" && (
-          <div className="animate-slide-up">
-            <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+          <div className="animate-slide-up space-y-6">
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {[
                 { label: "Ожидают проверки", value: pendingCount, icon: "Clock", color: "text-yellow-400", bg: "bg-yellow-500/15" },
-                { label: "Пользователей", value: users.length, icon: "Users", color: "text-purple-400", bg: "bg-purple-500/15" },
-                { label: "Активных учителей", value: users.filter(u => u.role === "teacher" && u.active).length, icon: "BookOpen", color: "text-blue-400", bg: "bg-blue-500/15" },
-                { label: "Заблокировано", value: users.filter(u => !u.active).length, icon: "Lock", color: "text-red-400", bg: "bg-red-500/15" },
+                { label: "Всего объявлений", value: announcements.length, icon: "Bell", color: "text-purple-400", bg: "bg-purple-500/15" },
+                { label: "Фото расписания", value: photos.length, icon: "Image", color: "text-cyan-400", bg: "bg-cyan-500/15" },
               ].map((s, i) => (
                 <div key={i} className="glass rounded-2xl p-5">
                   <div className={`w-10 h-10 rounded-xl ${s.bg} flex items-center justify-center mb-3`}>
@@ -255,189 +291,242 @@ export default function AdminPage() {
               ))}
             </div>
 
-            <div className="glass rounded-2xl p-6">
-              <h3 className="font-display text-xl font-bold text-white tracking-wide mb-4">ПОСЛЕДНИЕ ДЕЙСТВИЯ</h3>
-              <div className="space-y-3">
-                {[
-                  { icon: "CheckCircle", text: "Объявление «Родительское собрание» опубликовано", time: "2 ч назад", color: "text-green-400" },
-                  { icon: "Upload", text: "Загружено расписание для 8А класса", time: "5 ч назад", color: "text-purple-400" },
-                  { icon: "UserCheck", text: "Активирован аккаунт Иванова А.П.", time: "1 дн назад", color: "text-blue-400" },
-                  { icon: "XCircle", text: "Отклонено объявление о сборе средств", time: "2 дн назад", color: "text-red-400" },
-                ].map((a, i) => (
-                  <div key={i} className="flex items-center gap-3 text-sm">
-                    <Icon name={a.icon} size={16} className={a.color} />
-                    <span className="text-white/70 flex-1">{a.text}</span>
-                    <span className="text-white/30 text-xs">{a.time}</span>
-                  </div>
-                ))}
+            {pendingCount > 0 && (
+              <div className="glass rounded-2xl p-5 border border-yellow-500/20">
+                <div className="flex items-center gap-2 mb-3">
+                  <Icon name="Clock" size={16} className="text-yellow-400" />
+                  <h3 className="font-semibold text-yellow-400">
+                    {pendingCount} {pendingCount === 1 ? "объявление ожидает" : "объявления ожидают"} проверки
+                  </h3>
+                </div>
+                <button
+                  onClick={() => setActiveTab("announcements")}
+                  className="text-sm text-white/60 hover:text-white flex items-center gap-1 transition-colors"
+                >
+                  Перейти к модерации <Icon name="ArrowRight" size={14} />
+                </button>
               </div>
-            </div>
-          </div>
-        )}
+            )}
 
-        {/* Announcements moderation */}
-        {activeTab === "announcements" && (
-          <div className="space-y-4 animate-slide-up">
-            <div className="flex items-center gap-2 mb-2">
-              <Icon name="Info" size={14} className="text-white/40" />
-              <p className="text-white/40 text-sm">Объявления ожидают проверки перед публикацией</p>
-            </div>
-            {announcements.map((a) => (
-              <div key={a.id} className="glass rounded-2xl p-5">
-                <div className="flex items-start justify-between gap-4 mb-3">
-                  <div>
-                    <div className="flex items-center gap-2 mb-1">
-                      <h3 className="font-semibold text-white">{a.title}</h3>
-                      <span className={`px-2.5 py-0.5 rounded-lg text-xs font-semibold border ${
-                        a.status === "pending" ? "bg-yellow-500/20 text-yellow-300 border-yellow-500/30" :
-                        a.status === "approved" ? "bg-green-500/20 text-green-300 border-green-500/30" :
-                        "bg-red-500/20 text-red-300 border-red-500/30"
-                      }`}>
-                        {a.status === "pending" ? "На проверке" : a.status === "approved" ? "Опубликовано" : "Отклонено"}
+            <div className="glass rounded-2xl p-6">
+              <h3 className="font-display text-xl font-bold text-white tracking-wide mb-4">ПОСЛЕДНИЕ ОБЪЯВЛЕНИЯ</h3>
+              {annLoading ? (
+                <div className="space-y-3">
+                  {[1,2,3].map(i => <div key={i} className="h-10 bg-white/5 rounded-xl animate-pulse" />)}
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {announcements.slice(0, 5).map((a) => (
+                    <div key={a.id} className="flex items-center gap-3 text-sm py-2 border-b border-white/5 last:border-0">
+                      <span className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                        a.status === "approved" ? "bg-green-400" :
+                        a.status === "rejected" ? "bg-red-400" : "bg-yellow-400"
+                      }`} />
+                      <span className="text-white/70 flex-1 truncate">{a.title}</span>
+                      <span className="text-white/30 text-xs flex-shrink-0">
+                        {new Date(a.created_at).toLocaleDateString("ru-RU")}
                       </span>
                     </div>
-                    <p className="text-white/45 text-xs flex items-center gap-2">
-                      <Icon name="User" size={11} /> {a.author} · {a.date}
-                    </p>
-                  </div>
+                  ))}
                 </div>
-                <p className="text-white/60 text-sm mb-4 leading-relaxed">{a.content}</p>
-                {a.status === "pending" && (
-                  <div className="flex gap-3">
-                    <button
-                      onClick={() => handleAnnouncement(a.id, "approved")}
-                      className="flex items-center gap-2 px-4 py-2 rounded-xl bg-green-500/20 text-green-400 border border-green-500/30 text-sm font-medium hover:bg-green-500/30 transition-all"
-                    >
-                      <Icon name="CheckCircle" size={14} /> Опубликовать
-                    </button>
-                    <button
-                      onClick={() => handleAnnouncement(a.id, "rejected")}
-                      className="flex items-center gap-2 px-4 py-2 rounded-xl bg-red-500/20 text-red-400 border border-red-500/30 text-sm font-medium hover:bg-red-500/30 transition-all"
-                    >
-                      <Icon name="XCircle" size={14} /> Отклонить
-                    </button>
-                  </div>
-                )}
-              </div>
-            ))}
+              )}
+            </div>
           </div>
         )}
 
-        {/* Schedule upload */}
+        {/* ── ANNOUNCEMENTS ── */}
+        {activeTab === "announcements" && (
+          <div className="animate-slide-up space-y-4">
+
+            {/* New announcement form */}
+            <div className="glass rounded-2xl p-5 border border-purple-500/20">
+              <button
+                onClick={() => setShowNewAnn(!showNewAnn)}
+                className="w-full flex items-center justify-between text-left"
+              >
+                <span className="flex items-center gap-2 font-semibold text-white">
+                  <Icon name="PlusCircle" size={18} className="text-purple-400" />
+                  Создать новое объявление
+                </span>
+                <Icon name={showNewAnn ? "ChevronUp" : "ChevronDown"} size={16} className="text-white/40" />
+              </button>
+
+              {showNewAnn && (
+                <div className="mt-4 space-y-3 animate-fade-in">
+                  <input
+                    value={newAnn.title}
+                    onChange={(e) => setNewAnn({ ...newAnn, title: e.target.value })}
+                    placeholder="Заголовок объявления"
+                    className="w-full bg-white/5 border border-white/15 rounded-xl px-4 py-2.5 text-white text-sm placeholder-white/30 focus:outline-none focus:border-purple-500/60 transition-colors"
+                  />
+                  <textarea
+                    value={newAnn.content}
+                    onChange={(e) => setNewAnn({ ...newAnn, content: e.target.value })}
+                    placeholder="Текст объявления..."
+                    rows={3}
+                    className="w-full bg-white/5 border border-white/15 rounded-xl px-4 py-2.5 text-white text-sm placeholder-white/30 focus:outline-none focus:border-purple-500/60 transition-colors resize-none"
+                  />
+                  <div className="flex flex-wrap gap-3">
+                    <select
+                      value={newAnn.category}
+                      onChange={(e) => setNewAnn({ ...newAnn, category: e.target.value })}
+                      className="bg-white/5 border border-white/15 rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-purple-500/60"
+                    >
+                      <option value="admin" className="bg-background">Администрация</option>
+                      <option value="academic" className="bg-background">Учёба</option>
+                      <option value="events" className="bg-background">Событие</option>
+                      <option value="sport" className="bg-background">Спорт</option>
+                    </select>
+                    <input
+                      value={newAnn.author}
+                      onChange={(e) => setNewAnn({ ...newAnn, author: e.target.value })}
+                      placeholder="Автор"
+                      className="flex-1 min-w-32 bg-white/5 border border-white/15 rounded-xl px-3 py-2 text-white text-sm placeholder-white/30 focus:outline-none focus:border-purple-500/60"
+                    />
+                    <label className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white/5 border border-white/15 cursor-pointer hover:bg-white/10 transition-colors">
+                      <input
+                        type="checkbox"
+                        checked={newAnn.pinned}
+                        onChange={(e) => setNewAnn({ ...newAnn, pinned: e.target.checked })}
+                        className="accent-purple-500"
+                      />
+                      <span className="text-white/70 text-sm">📌 Закрепить</span>
+                    </label>
+                  </div>
+                  <button
+                    onClick={handleCreateAnnouncement}
+                    disabled={annSaving || !newAnn.title.trim()}
+                    className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-violet-600 text-white font-semibold text-sm hover:opacity-90 transition-all disabled:opacity-50 glow-purple"
+                  >
+                    {annSaving ? "Публикую..." : "Опубликовать"}
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Announcements list */}
+            {annLoading ? (
+              <div className="space-y-3">
+                {[1,2,3].map(i => <div key={i} className="glass rounded-2xl h-24 animate-pulse" />)}
+              </div>
+            ) : (
+              announcements.map((a) => (
+                <div key={a.id} className="glass rounded-2xl p-5">
+                  <div className="flex items-start justify-between gap-4 mb-2">
+                    <div>
+                      <div className="flex items-center gap-2 mb-1">
+                        <h3 className="font-semibold text-white">{a.title}</h3>
+                        <span className={`px-2.5 py-0.5 rounded-lg text-xs font-semibold border ${
+                          a.status === "pending" ? "bg-yellow-500/20 text-yellow-300 border-yellow-500/30" :
+                          a.status === "approved" ? "bg-green-500/20 text-green-300 border-green-500/30" :
+                          "bg-red-500/20 text-red-300 border-red-500/30"
+                        }`}>
+                          {a.status === "pending" ? "На проверке" : a.status === "approved" ? "Опубликовано" : "Отклонено"}
+                        </span>
+                        {a.pinned && <span className="text-yellow-400 text-xs">📌</span>}
+                      </div>
+                      <p className="text-white/40 text-xs">
+                        {a.author} · {new Date(a.created_at).toLocaleDateString("ru-RU")}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => handleDeleteAnnouncement(a.id)}
+                      className="flex-shrink-0 w-8 h-8 rounded-lg bg-red-500/15 text-red-400 hover:bg-red-500/30 flex items-center justify-center transition-all"
+                    >
+                      <Icon name="Trash2" size={14} />
+                    </button>
+                  </div>
+                  <p className="text-white/60 text-sm mb-4 leading-relaxed">{a.content}</p>
+                  {a.status === "pending" && (
+                    <div className="flex gap-3">
+                      <button
+                        onClick={() => handleAnnouncementAction(a.id, "approved")}
+                        className="flex items-center gap-2 px-4 py-2 rounded-xl bg-green-500/20 text-green-400 border border-green-500/30 text-sm font-medium hover:bg-green-500/30 transition-all"
+                      >
+                        <Icon name="CheckCircle" size={14} /> Опубликовать
+                      </button>
+                      <button
+                        onClick={() => handleAnnouncementAction(a.id, "rejected")}
+                        className="flex items-center gap-2 px-4 py-2 rounded-xl bg-red-500/20 text-red-400 border border-red-500/30 text-sm font-medium hover:bg-red-500/30 transition-all"
+                      >
+                        <Icon name="XCircle" size={14} /> Отклонить
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))
+            )}
+
+            {!annLoading && announcements.length === 0 && (
+              <div className="glass rounded-2xl p-12 text-center">
+                <Icon name="BellOff" size={40} className="text-white/20 mx-auto mb-3" />
+                <p className="text-white/40">Объявлений пока нет</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── SCHEDULE ── */}
         {activeTab === "schedule" && (
           <div className="animate-slide-up space-y-6">
             <div className="glass rounded-2xl p-6 border border-dashed border-white/20">
-              <div className="text-center py-6">
+              <div className="text-center py-4">
                 <div className="w-16 h-16 rounded-2xl bg-purple-500/20 flex items-center justify-center mx-auto mb-4">
                   <Icon name="Upload" size={28} className="text-purple-400" />
                 </div>
-                <h3 className="font-display text-xl font-bold text-white tracking-wide mb-2">
-                  ЗАГРУЗИТЬ РАСПИСАНИЕ
-                </h3>
-                <p className="text-white/45 text-sm mb-6">Поддерживаются форматы: Excel (.xlsx), PDF, изображения</p>
+                <h3 className="font-display text-xl font-bold text-white tracking-wide mb-2">ЗАГРУЗИТЬ ФОТО РАСПИСАНИЯ</h3>
+                <p className="text-white/45 text-sm mb-6">JPG, PNG, WEBP — фото сохранится в облаке</p>
                 <label className="cursor-pointer">
                   <input
                     type="file"
-                    accept=".xlsx,.pdf,.jpg,.jpeg,.png"
+                    accept="image/*"
                     className="hidden"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) setScheduleFile(file.name);
-                    }}
+                    onChange={handlePhotoUpload}
+                    disabled={photoUploading}
                   />
-                  <span className="px-8 py-3 rounded-xl bg-gradient-to-r from-purple-600 to-violet-600 text-white font-semibold text-sm hover:opacity-90 transition-opacity glow-purple inline-block">
-                    Выбрать файл
+                  <span className={`px-8 py-3 rounded-xl bg-gradient-to-r from-purple-600 to-violet-600 text-white font-semibold text-sm transition-opacity glow-purple inline-flex items-center gap-2 ${photoUploading ? "opacity-60" : "hover:opacity-90 cursor-pointer"}`}>
+                    <Icon name={photoUploading ? "Loader" : "ImagePlus"} size={16} className={photoUploading ? "animate-spin" : ""} />
+                    {photoUploading ? "Загружаю..." : "Выбрать фото"}
                   </span>
                 </label>
-                {scheduleFile && (
-                  <div className="mt-4 flex items-center justify-center gap-2 text-green-400 text-sm animate-fade-in">
-                    <Icon name="CheckCircle" size={16} />
-                    Выбран файл: <strong>{scheduleFile}</strong>
-                  </div>
+                {photoError && (
+                  <p className="text-red-400 text-sm mt-3 flex items-center justify-center gap-1">
+                    <Icon name="AlertCircle" size={14} /> {photoError}
+                  </p>
                 )}
               </div>
             </div>
 
-            <div className="glass rounded-2xl p-6">
-              <h3 className="font-display text-xl font-bold text-white tracking-wide mb-4">ЗАГРУЖЕННЫЕ ФАЙЛЫ</h3>
-              <div className="space-y-3">
-                {[
-                  { name: "schedule_5-6_classes_april.xlsx", date: "01.04.2026", size: "24 КБ" },
-                  { name: "schedule_7-9_classes_april.xlsx", date: "01.04.2026", size: "31 КБ" },
-                  { name: "schedule_10-11_classes_april.xlsx", date: "31.03.2026", size: "18 КБ" },
-                ].map((f, i) => (
-                  <div key={i} className="flex items-center gap-4 p-3 rounded-xl bg-white/4 hover:bg-white/8 transition-colors">
-                    <div className="w-8 h-8 rounded-lg bg-green-500/20 flex items-center justify-center flex-shrink-0">
-                      <Icon name="FileSpreadsheet" size={16} className="text-green-400" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-white/80 text-sm truncate">{f.name}</p>
-                      <p className="text-white/35 text-xs">{f.date} · {f.size}</p>
-                    </div>
-                    <button className="text-white/30 hover:text-red-400 transition-colors">
-                      <Icon name="Trash2" size={16} />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Users */}
-        {activeTab === "users" && (
-          <div className="animate-slide-up">
-            <div className="glass rounded-2xl overflow-hidden">
-              <div className="p-5 border-b border-white/10 flex items-center justify-between">
-                <h3 className="font-display text-xl font-bold text-white tracking-wide">
-                  ПОЛЬЗОВАТЕЛИ ({users.length})
+            {photos.length > 0 && (
+              <div className="glass rounded-2xl p-5">
+                <h3 className="font-display text-xl font-bold text-white tracking-wide mb-4">
+                  ЗАГРУЖЕННЫЕ ФОТО ({photos.length})
                 </h3>
-                <button className="flex items-center gap-2 px-4 py-2 rounded-xl bg-purple-500/20 text-purple-400 border border-purple-500/30 text-sm font-medium hover:bg-purple-500/30 transition-all">
-                  <Icon name="UserPlus" size={14} />
-                  Добавить
-                </button>
-              </div>
-              <div className="divide-y divide-white/5">
-                {users.map((u) => (
-                  <div key={u.id} className="p-4 flex items-center gap-4 hover:bg-white/3 transition-colors">
-                    <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-purple-600/40 to-pink-600/40 flex items-center justify-center flex-shrink-0">
-                      <Icon name="User" size={16} className="text-white/60" />
+                <div className="grid sm:grid-cols-2 gap-4">
+                  {photos.map((photo) => (
+                    <div key={photo.id} className="rounded-xl overflow-hidden border border-white/10 bg-white/3">
+                      <img src={photo.url} alt={photo.filename} className="w-full h-40 object-cover" />
+                      <div className="p-3 flex items-center justify-between">
+                        <div>
+                          <p className="text-white/60 text-xs truncate max-w-32">{photo.filename}</p>
+                          <p className="text-white/30 text-xs">{new Date(photo.uploaded_at).toLocaleDateString("ru-RU")}</p>
+                        </div>
+                        <button
+                          onClick={() => handleDeletePhoto(photo.id)}
+                          className="w-8 h-8 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 flex items-center justify-center transition-all"
+                        >
+                          <Icon name="Trash2" size={14} />
+                        </button>
+                      </div>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className={`text-sm font-semibold ${u.active ? "text-white" : "text-white/40"}`}>
-                        {u.name}
-                      </p>
-                      <p className="text-white/35 text-xs">{u.email}</p>
-                    </div>
-                    <select
-                      value={u.role}
-                      onChange={(e) => changeUserRole(u.id, e.target.value as User["role"])}
-                      className={`text-xs font-semibold px-2.5 py-1 rounded-lg border bg-transparent cursor-pointer focus:outline-none ${roleColors[u.role]}`}
-                    >
-                      <option value="admin" className="bg-background text-white">Администратор</option>
-                      <option value="teacher" className="bg-background text-white">Учитель</option>
-                      <option value="student" className="bg-background text-white">Ученик</option>
-                      <option value="parent" className="bg-background text-white">Родитель</option>
-                    </select>
-                    <button
-                      onClick={() => toggleUserActive(u.id)}
-                      className={`flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center transition-all ${
-                        u.active
-                          ? "bg-green-500/20 text-green-400 hover:bg-red-500/20 hover:text-red-400"
-                          : "bg-red-500/20 text-red-400 hover:bg-green-500/20 hover:text-green-400"
-                      }`}
-                      title={u.active ? "Заблокировать" : "Разблокировать"}
-                    >
-                      <Icon name={u.active ? "UserCheck" : "UserX"} size={15} />
-                    </button>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
           </div>
         )}
 
-        {/* Settings */}
+        {/* ── SETTINGS ── */}
         {activeTab === "settings" && (
           <div className="animate-slide-up space-y-6">
 
@@ -448,152 +537,89 @@ export default function AdminPage() {
               </div>
             )}
 
-            {/* General */}
             <div className="glass rounded-2xl p-6">
               <div className="flex items-center gap-2 mb-5">
                 <Icon name="Globe" size={16} className="text-purple-400" />
-                <h3 className="font-display text-xl font-bold text-white tracking-wide">ОБЩИЕ НАСТРОЙКИ</h3>
+                <h3 className="font-display text-xl font-bold text-white tracking-wide">ОБЩИЕ</h3>
               </div>
               <div className="grid sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="text-white/50 text-xs mb-1.5 block">Название сайта</label>
-                  <input
-                    value={siteSettings.siteName}
-                    onChange={(e) => setSiteSettings({ ...siteSettings, siteName: e.target.value })}
-                    className="w-full bg-white/5 border border-white/15 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:border-purple-500/60 transition-colors"
-                  />
-                </div>
-                <div>
-                  <label className="text-white/50 text-xs mb-1.5 block">Подзаголовок</label>
-                  <input
-                    value={siteSettings.siteSubtitle}
-                    onChange={(e) => setSiteSettings({ ...siteSettings, siteSubtitle: e.target.value })}
-                    className="w-full bg-white/5 border border-white/15 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:border-purple-500/60 transition-colors"
-                  />
-                </div>
+                {[
+                  { key: "site_name", label: "Название сайта" },
+                  { key: "site_subtitle", label: "Подзаголовок" },
+                ].map(({ key, label }) => (
+                  <div key={key}>
+                    <label className="text-white/50 text-xs mb-1.5 block">{label}</label>
+                    <input
+                      value={settings[key] ?? ""}
+                      onChange={(e) => setSettings({ ...settings, [key]: e.target.value })}
+                      className="w-full bg-white/5 border border-white/15 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:border-purple-500/60 transition-colors"
+                    />
+                  </div>
+                ))}
                 <div className="sm:col-span-2">
-                  <label className="text-white/50 text-xs mb-1.5 block">Текст бегущей строки</label>
+                  <label className="text-white/50 text-xs mb-1.5 block">Бегущая строка новостей</label>
                   <input
-                    value={siteSettings.tickerText}
-                    onChange={(e) => setSiteSettings({ ...siteSettings, tickerText: e.target.value })}
+                    value={settings.ticker_text ?? ""}
+                    onChange={(e) => setSettings({ ...settings, ticker_text: e.target.value })}
                     className="w-full bg-white/5 border border-white/15 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:border-purple-500/60 transition-colors"
                   />
                 </div>
               </div>
             </div>
 
-            {/* Contacts settings */}
             <div className="glass rounded-2xl p-6">
               <div className="flex items-center gap-2 mb-5">
                 <Icon name="Phone" size={16} className="text-cyan-400" />
                 <h3 className="font-display text-xl font-bold text-white tracking-wide">КОНТАКТЫ</h3>
               </div>
               <div className="grid sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="text-white/50 text-xs mb-1.5 block">Адрес школы</label>
-                  <input
-                    value={siteSettings.schoolAddress}
-                    onChange={(e) => setSiteSettings({ ...siteSettings, schoolAddress: e.target.value })}
-                    className="w-full bg-white/5 border border-white/15 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:border-cyan-500/60 transition-colors"
-                  />
-                </div>
-                <div>
-                  <label className="text-white/50 text-xs mb-1.5 block">Телефон</label>
-                  <input
-                    value={siteSettings.schoolPhone}
-                    onChange={(e) => setSiteSettings({ ...siteSettings, schoolPhone: e.target.value })}
-                    className="w-full bg-white/5 border border-white/15 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:border-cyan-500/60 transition-colors"
-                  />
-                </div>
-                <div>
-                  <label className="text-white/50 text-xs mb-1.5 block">Email школы</label>
-                  <input
-                    value={siteSettings.schoolEmail}
-                    onChange={(e) => setSiteSettings({ ...siteSettings, schoolEmail: e.target.value })}
-                    className="w-full bg-white/5 border border-white/15 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:border-cyan-500/60 transition-colors"
-                  />
-                </div>
-                <div>
-                  <label className="text-white/50 text-xs mb-1.5 block">Telegram администратора</label>
-                  <input
-                    value={siteSettings.telegramAdmin}
-                    onChange={(e) => setSiteSettings({ ...siteSettings, telegramAdmin: e.target.value })}
-                    className="w-full bg-white/5 border border-white/15 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:border-cyan-500/60 transition-colors"
-                  />
-                </div>
-                <div className="sm:col-span-2">
-                  <label className="text-white/50 text-xs mb-1.5 block">Ссылка на Telegram-канал</label>
-                  <input
-                    value={siteSettings.telegramLink}
-                    onChange={(e) => setSiteSettings({ ...siteSettings, telegramLink: e.target.value })}
-                    className="w-full bg-white/5 border border-white/15 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:border-cyan-500/60 transition-colors"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Visibility settings */}
-            <div className="glass rounded-2xl p-6">
-              <div className="flex items-center gap-2 mb-5">
-                <Icon name="Eye" size={16} className="text-pink-400" />
-                <h3 className="font-display text-xl font-bold text-white tracking-wide">ОТОБРАЖЕНИЕ РАЗДЕЛОВ</h3>
-              </div>
-              <div className="space-y-3">
                 {[
-                  { key: "showSchedulePhoto", label: "Показывать вкладку «Фото расписания»", icon: "Image" },
-                  { key: "showAnnouncements", label: "Показывать раздел «Объявления»", icon: "Bell" },
-                  { key: "showContacts", label: "Показывать раздел «Контакты»", icon: "Phone" },
-                ].map((item) => (
-                  <div key={item.key} className="flex items-center justify-between p-4 rounded-xl bg-white/4 hover:bg-white/6 transition-colors">
-                    <div className="flex items-center gap-3">
-                      <Icon name={item.icon} size={16} className="text-white/50" />
-                      <span className="text-white/80 text-sm">{item.label}</span>
-                    </div>
-                    <button
-                      onClick={() => setSiteSettings({ ...siteSettings, [item.key]: !siteSettings[item.key as keyof typeof siteSettings] })}
-                      className={`w-12 h-6 rounded-full transition-all relative ${
-                        siteSettings[item.key as keyof typeof siteSettings]
-                          ? "bg-purple-600"
-                          : "bg-white/15"
-                      }`}
-                    >
-                      <span className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${
-                        siteSettings[item.key as keyof typeof siteSettings] ? "left-7" : "left-1"
-                      }`} />
-                    </button>
+                  { key: "school_address", label: "Адрес школы" },
+                  { key: "school_phone", label: "Телефон" },
+                  { key: "school_email", label: "Email" },
+                  { key: "telegram_admin", label: "Telegram администратора" },
+                  { key: "telegram_link", label: "Ссылка Telegram-канала" },
+                ].map(({ key, label }) => (
+                  <div key={key} className={key === "telegram_link" ? "sm:col-span-2" : ""}>
+                    <label className="text-white/50 text-xs mb-1.5 block">{label}</label>
+                    <input
+                      value={settings[key] ?? ""}
+                      onChange={(e) => setSettings({ ...settings, [key]: e.target.value })}
+                      className="w-full bg-white/5 border border-white/15 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:border-cyan-500/60 transition-colors"
+                    />
                   </div>
                 ))}
               </div>
             </div>
 
-            {/* Security */}
             <div className="glass rounded-2xl p-6">
               <div className="flex items-center gap-2 mb-5">
                 <Icon name="Lock" size={16} className="text-red-400" />
-                <h3 className="font-display text-xl font-bold text-white tracking-wide">БЕЗОПАСНОСТЬ</h3>
+                <h3 className="font-display text-xl font-bold text-white tracking-wide">СМЕНА ПАРОЛЯ</h3>
               </div>
               <div className="max-w-sm">
-                <label className="text-white/50 text-xs mb-1.5 block">Новый пароль администратора</label>
+                <label className="text-white/50 text-xs mb-1.5 block">Новый пароль</label>
                 <input
                   type="password"
-                  value={siteSettings.adminPassword}
-                  onChange={(e) => setSiteSettings({ ...siteSettings, adminPassword: e.target.value })}
+                  value={settings.admin_password ?? ""}
+                  onChange={(e) => setSettings({ ...settings, admin_password: e.target.value })}
+                  placeholder="Оставьте пустым, чтобы не менять"
                   className="w-full bg-white/5 border border-white/15 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:border-red-500/60 transition-colors"
-                  placeholder="Введите новый пароль..."
                 />
-                <p className="text-white/30 text-xs mt-1.5">Минимум 6 символов</p>
+                <p className="text-white/30 text-xs mt-1.5">Минимум 4 символа</p>
               </div>
             </div>
 
-            {/* Save button */}
             <button
               onClick={handleSaveSettings}
-              className="w-full py-4 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold text-base hover:opacity-90 transition-all hover:scale-[1.01] glow-purple"
+              disabled={settingsSaving}
+              className="w-full py-4 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold text-base hover:opacity-90 transition-all hover:scale-[1.01] glow-purple disabled:opacity-60 disabled:scale-100"
             >
-              Сохранить все настройки
+              {settingsSaving ? "Сохраняю..." : "Сохранить настройки"}
             </button>
           </div>
         )}
+
       </div>
     </div>
   );
