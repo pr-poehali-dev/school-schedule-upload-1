@@ -70,7 +70,7 @@ const roleColors: Record<User["role"], string> = {
   parent: "bg-amber-500/20 text-amber-300 border-amber-500/30",
 };
 
-type AdminTab = "overview" | "announcements" | "schedule" | "users";
+type AdminTab = "overview" | "announcements" | "schedule" | "users" | "settings";
 
 export default function AdminPage() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -80,6 +80,27 @@ export default function AdminPage() {
   const [announcements, setAnnouncements] = useState(initialAnnouncements);
   const [users, setUsers] = useState(initialUsers);
   const [scheduleFile, setScheduleFile] = useState<string | null>(null);
+
+  const [siteSettings, setSiteSettings] = useState({
+    siteName: "Расписание уроков школа №4",
+    siteSubtitle: "2025–2026 учебный год",
+    telegramLink: "https://t.me/Schedule_Lessons4_LSK",
+    telegramAdmin: "@Germann12_21",
+    schoolAddress: "г. Москва, ул. Школьная, д. 1",
+    schoolPhone: "+7 (495) 123-45-67",
+    schoolEmail: "school@example.edu.ru",
+    tickerText: "📣 Завтра, 4 апреля — родительское собрание в 18:00 · 🏆 Олимпиада по математике — 10 апреля · 🎨 Выставка рисунков в актовом зале",
+    adminPassword: "admin123",
+    showSchedulePhoto: true,
+    showAnnouncements: true,
+    showContacts: true,
+  });
+  const [settingsSaved, setSettingsSaved] = useState(false);
+
+  const handleSaveSettings = () => {
+    setSettingsSaved(true);
+    setTimeout(() => setSettingsSaved(false), 2500);
+  };
 
   const handleLogin = () => {
     if (password === ADMIN_PASSWORD) {
@@ -163,6 +184,7 @@ export default function AdminPage() {
     { id: "announcements", label: "Объявления", icon: "Bell", badge: pendingCount },
     { id: "schedule", label: "Расписание", icon: "CalendarDays" },
     { id: "users", label: "Пользователи", icon: "Users" },
+    { id: "settings", label: "Настройки", icon: "Settings" },
   ];
 
   return (
@@ -412,6 +434,164 @@ export default function AdminPage() {
                 ))}
               </div>
             </div>
+          </div>
+        )}
+
+        {/* Settings */}
+        {activeTab === "settings" && (
+          <div className="animate-slide-up space-y-6">
+
+            {settingsSaved && (
+              <div className="glass rounded-xl px-5 py-3 flex items-center gap-3 border border-green-500/40 animate-fade-in">
+                <Icon name="CheckCircle" size={18} className="text-green-400" />
+                <span className="text-green-400 font-semibold text-sm">Настройки сохранены!</span>
+              </div>
+            )}
+
+            {/* General */}
+            <div className="glass rounded-2xl p-6">
+              <div className="flex items-center gap-2 mb-5">
+                <Icon name="Globe" size={16} className="text-purple-400" />
+                <h3 className="font-display text-xl font-bold text-white tracking-wide">ОБЩИЕ НАСТРОЙКИ</h3>
+              </div>
+              <div className="grid sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-white/50 text-xs mb-1.5 block">Название сайта</label>
+                  <input
+                    value={siteSettings.siteName}
+                    onChange={(e) => setSiteSettings({ ...siteSettings, siteName: e.target.value })}
+                    className="w-full bg-white/5 border border-white/15 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:border-purple-500/60 transition-colors"
+                  />
+                </div>
+                <div>
+                  <label className="text-white/50 text-xs mb-1.5 block">Подзаголовок</label>
+                  <input
+                    value={siteSettings.siteSubtitle}
+                    onChange={(e) => setSiteSettings({ ...siteSettings, siteSubtitle: e.target.value })}
+                    className="w-full bg-white/5 border border-white/15 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:border-purple-500/60 transition-colors"
+                  />
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="text-white/50 text-xs mb-1.5 block">Текст бегущей строки</label>
+                  <input
+                    value={siteSettings.tickerText}
+                    onChange={(e) => setSiteSettings({ ...siteSettings, tickerText: e.target.value })}
+                    className="w-full bg-white/5 border border-white/15 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:border-purple-500/60 transition-colors"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Contacts settings */}
+            <div className="glass rounded-2xl p-6">
+              <div className="flex items-center gap-2 mb-5">
+                <Icon name="Phone" size={16} className="text-cyan-400" />
+                <h3 className="font-display text-xl font-bold text-white tracking-wide">КОНТАКТЫ</h3>
+              </div>
+              <div className="grid sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-white/50 text-xs mb-1.5 block">Адрес школы</label>
+                  <input
+                    value={siteSettings.schoolAddress}
+                    onChange={(e) => setSiteSettings({ ...siteSettings, schoolAddress: e.target.value })}
+                    className="w-full bg-white/5 border border-white/15 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:border-cyan-500/60 transition-colors"
+                  />
+                </div>
+                <div>
+                  <label className="text-white/50 text-xs mb-1.5 block">Телефон</label>
+                  <input
+                    value={siteSettings.schoolPhone}
+                    onChange={(e) => setSiteSettings({ ...siteSettings, schoolPhone: e.target.value })}
+                    className="w-full bg-white/5 border border-white/15 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:border-cyan-500/60 transition-colors"
+                  />
+                </div>
+                <div>
+                  <label className="text-white/50 text-xs mb-1.5 block">Email школы</label>
+                  <input
+                    value={siteSettings.schoolEmail}
+                    onChange={(e) => setSiteSettings({ ...siteSettings, schoolEmail: e.target.value })}
+                    className="w-full bg-white/5 border border-white/15 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:border-cyan-500/60 transition-colors"
+                  />
+                </div>
+                <div>
+                  <label className="text-white/50 text-xs mb-1.5 block">Telegram администратора</label>
+                  <input
+                    value={siteSettings.telegramAdmin}
+                    onChange={(e) => setSiteSettings({ ...siteSettings, telegramAdmin: e.target.value })}
+                    className="w-full bg-white/5 border border-white/15 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:border-cyan-500/60 transition-colors"
+                  />
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="text-white/50 text-xs mb-1.5 block">Ссылка на Telegram-канал</label>
+                  <input
+                    value={siteSettings.telegramLink}
+                    onChange={(e) => setSiteSettings({ ...siteSettings, telegramLink: e.target.value })}
+                    className="w-full bg-white/5 border border-white/15 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:border-cyan-500/60 transition-colors"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Visibility settings */}
+            <div className="glass rounded-2xl p-6">
+              <div className="flex items-center gap-2 mb-5">
+                <Icon name="Eye" size={16} className="text-pink-400" />
+                <h3 className="font-display text-xl font-bold text-white tracking-wide">ОТОБРАЖЕНИЕ РАЗДЕЛОВ</h3>
+              </div>
+              <div className="space-y-3">
+                {[
+                  { key: "showSchedulePhoto", label: "Показывать вкладку «Фото расписания»", icon: "Image" },
+                  { key: "showAnnouncements", label: "Показывать раздел «Объявления»", icon: "Bell" },
+                  { key: "showContacts", label: "Показывать раздел «Контакты»", icon: "Phone" },
+                ].map((item) => (
+                  <div key={item.key} className="flex items-center justify-between p-4 rounded-xl bg-white/4 hover:bg-white/6 transition-colors">
+                    <div className="flex items-center gap-3">
+                      <Icon name={item.icon} size={16} className="text-white/50" />
+                      <span className="text-white/80 text-sm">{item.label}</span>
+                    </div>
+                    <button
+                      onClick={() => setSiteSettings({ ...siteSettings, [item.key]: !siteSettings[item.key as keyof typeof siteSettings] })}
+                      className={`w-12 h-6 rounded-full transition-all relative ${
+                        siteSettings[item.key as keyof typeof siteSettings]
+                          ? "bg-purple-600"
+                          : "bg-white/15"
+                      }`}
+                    >
+                      <span className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${
+                        siteSettings[item.key as keyof typeof siteSettings] ? "left-7" : "left-1"
+                      }`} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Security */}
+            <div className="glass rounded-2xl p-6">
+              <div className="flex items-center gap-2 mb-5">
+                <Icon name="Lock" size={16} className="text-red-400" />
+                <h3 className="font-display text-xl font-bold text-white tracking-wide">БЕЗОПАСНОСТЬ</h3>
+              </div>
+              <div className="max-w-sm">
+                <label className="text-white/50 text-xs mb-1.5 block">Новый пароль администратора</label>
+                <input
+                  type="password"
+                  value={siteSettings.adminPassword}
+                  onChange={(e) => setSiteSettings({ ...siteSettings, adminPassword: e.target.value })}
+                  className="w-full bg-white/5 border border-white/15 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:border-red-500/60 transition-colors"
+                  placeholder="Введите новый пароль..."
+                />
+                <p className="text-white/30 text-xs mt-1.5">Минимум 6 символов</p>
+              </div>
+            </div>
+
+            {/* Save button */}
+            <button
+              onClick={handleSaveSettings}
+              className="w-full py-4 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold text-base hover:opacity-90 transition-all hover:scale-[1.01] glow-purple"
+            >
+              Сохранить все настройки
+            </button>
           </div>
         )}
       </div>

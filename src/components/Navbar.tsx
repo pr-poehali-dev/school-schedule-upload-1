@@ -30,7 +30,7 @@ export default function Navbar({ currentPage, onNavigate }: NavbarProps) {
               <Icon name="GraduationCap" size={18} className="text-white" />
             </div>
             <span className="font-display text-xl font-bold gradient-text tracking-wide">
-              ШКОЛАПОРТАЛ
+              ШКОЛА №4
             </span>
           </button>
 
@@ -50,6 +50,15 @@ export default function Navbar({ currentPage, onNavigate }: NavbarProps) {
                 {item.label}
               </button>
             ))}
+            <a
+              href="https://t.me/Schedule_Lessons4_LSK"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 bg-cyan-500/15 text-cyan-400 border border-cyan-500/30 hover:bg-cyan-500/25 hover:text-cyan-300"
+            >
+              <Icon name="Send" size={15} />
+              Мы в телеграме
+            </a>
           </div>
 
           {/* Mobile burger */}
@@ -83,6 +92,16 @@ export default function Navbar({ currentPage, onNavigate }: NavbarProps) {
                 {item.label}
               </button>
             ))}
+            <a
+              href="https://t.me/Schedule_Lessons4_LSK"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all bg-cyan-500/15 text-cyan-400 border border-cyan-500/25"
+              onClick={() => setMobileOpen(false)}
+            >
+              <Icon name="Send" size={16} />
+              Мы в телеграме
+            </a>
           </div>
         </div>
       )}

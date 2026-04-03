@@ -2,44 +2,43 @@ import { useState } from "react";
 import Icon from "@/components/ui/icon";
 
 const classes = ["5А", "5Б", "6А", "6Б", "7А", "7Б", "8А", "8Б", "9А", "9Б", "10А", "11А"];
-
 const days = ["Понедельник", "Вторник", "Среда", "Четверг", "Пятница"];
 
-const scheduleData: Record<string, Record<string, { subject: string; teacher: string; room: string }[]>> = {
+const scheduleData: Record<string, Record<string, { subject: string; room: string }[]>> = {
   "5А": {
     Понедельник: [
-      { subject: "Математика", teacher: "Иванова А.П.", room: "201" },
-      { subject: "Русский язык", teacher: "Смирнова Т.В.", room: "105" },
-      { subject: "Физкультура", teacher: "Козлов Д.И.", room: "Зал" },
-      { subject: "История", teacher: "Петрова Н.С.", room: "310" },
-      { subject: "Биология", teacher: "Морозова Е.А.", room: "215" },
+      { subject: "Математика", room: "201" },
+      { subject: "Русский язык", room: "105" },
+      { subject: "Физкультура", room: "Зал" },
+      { subject: "История", room: "310" },
+      { subject: "Биология", room: "215" },
     ],
     Вторник: [
-      { subject: "Литература", teacher: "Смирнова Т.В.", room: "105" },
-      { subject: "Алгебра", teacher: "Иванова А.П.", room: "201" },
-      { subject: "Химия", teacher: "Лебедева О.Н.", room: "220" },
-      { subject: "Информатика", teacher: "Сидоров В.Г.", room: "Каб.ИТ" },
-      { subject: "Английский", teacher: "Волкова М.П.", room: "112" },
+      { subject: "Литература", room: "105" },
+      { subject: "Алгебра", room: "201" },
+      { subject: "Химия", room: "220" },
+      { subject: "Информатика", room: "Каб.ИТ" },
+      { subject: "Английский", room: "112" },
     ],
     Среда: [
-      { subject: "Математика", teacher: "Иванова А.П.", room: "201" },
-      { subject: "География", teacher: "Орлова Л.Ф.", room: "308" },
-      { subject: "Физкультура", teacher: "Козлов Д.И.", room: "Зал" },
-      { subject: "Рисование", teacher: "Белова И.С.", room: "Студия" },
-      { subject: "Музыка", teacher: "Зайцев К.О.", room: "Муз.класс" },
+      { subject: "Математика", room: "201" },
+      { subject: "География", room: "308" },
+      { subject: "Физкультура", room: "Зал" },
+      { subject: "Рисование", room: "Студия" },
+      { subject: "Музыка", room: "Муз.класс" },
     ],
     Четверг: [
-      { subject: "Физика", teacher: "Новиков А.В.", room: "205" },
-      { subject: "Русский язык", teacher: "Смирнова Т.В.", room: "105" },
-      { subject: "История", teacher: "Петрова Н.С.", room: "310" },
-      { subject: "Алгебра", teacher: "Иванова А.П.", room: "201" },
-      { subject: "Биология", teacher: "Морозова Е.А.", room: "215" },
+      { subject: "Физика", room: "205" },
+      { subject: "Русский язык", room: "105" },
+      { subject: "История", room: "310" },
+      { subject: "Алгебра", room: "201" },
+      { subject: "Биология", room: "215" },
     ],
     Пятница: [
-      { subject: "Литература", teacher: "Смирнова Т.В.", room: "105" },
-      { subject: "Физика", teacher: "Новиков А.В.", room: "205" },
-      { subject: "Английский", teacher: "Волкова М.П.", room: "112" },
-      { subject: "Информатика", teacher: "Сидоров В.Г.", room: "Каб.ИТ" },
+      { subject: "Литература", room: "105" },
+      { subject: "Физика", room: "205" },
+      { subject: "Английский", room: "112" },
+      { subject: "Информатика", room: "Каб.ИТ" },
     ],
   },
 };
@@ -64,123 +63,231 @@ const subjectColors: Record<string, string> = {
 const todayIndex = new Date().getDay() - 1;
 const defaultDay = todayIndex >= 0 && todayIndex < 5 ? days[todayIndex] : days[0];
 
+type ViewMode = "list" | "photo";
+
 export default function SchedulePage() {
   const [selectedClass, setSelectedClass] = useState("5А");
   const [selectedDay, setSelectedDay] = useState(defaultDay);
+  const [viewMode, setViewMode] = useState<ViewMode>("list");
+  const [uploadedPhoto, setUploadedPhoto] = useState<string | null>(null);
 
   const currentSchedule = scheduleData[selectedClass]?.[selectedDay] ?? [];
-
   const getColor = (subject: string) =>
     subjectColors[subject] || "bg-white/10 text-white/70 border-white/20";
+
+  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      setUploadedPhoto(ev.target?.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
 
   return (
     <div className="min-h-screen bg-background bg-grid pt-24 pb-16">
       <div className="max-w-5xl mx-auto px-4">
         {/* Header */}
         <div className="mb-8 animate-slide-up">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-600 to-violet-600 flex items-center justify-center glow-purple">
-              <Icon name="CalendarDays" size={20} className="text-white" />
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-600 to-violet-600 flex items-center justify-center glow-purple">
+                <Icon name="CalendarDays" size={20} className="text-white" />
+              </div>
+              <div>
+                <h1 className="font-display text-4xl font-bold text-white tracking-wide">
+                  РАСПИСАНИЕ УРОКОВ
+                </h1>
+                <p className="text-white/50 text-sm">Школа №4 · 2025–2026 учебный год</p>
+              </div>
             </div>
-            <h1 className="font-display text-4xl font-bold text-white tracking-wide">
-              РАСПИСАНИЕ
-            </h1>
-          </div>
-          <p className="text-white/50 ml-13">2025–2026 учебный год · I полугодие</p>
-        </div>
-
-        {/* Class selector */}
-        <div className="glass rounded-2xl p-4 mb-6 animate-slide-up" style={{ animationDelay: "0.1s" }}>
-          <div className="flex items-center gap-2 mb-3">
-            <Icon name="Users" size={14} className="text-white/50" />
-            <span className="text-white/50 text-sm font-medium">Класс</span>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {classes.map((cls) => (
+            {/* View mode toggle */}
+            <div className="flex items-center gap-1 glass rounded-xl p-1">
               <button
-                key={cls}
-                onClick={() => setSelectedClass(cls)}
-                className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
-                  selectedClass === cls
-                    ? "bg-gradient-to-r from-purple-600 to-violet-600 text-white glow-purple scale-105"
-                    : "glass border border-white/10 text-white/60 hover:text-white hover:border-white/25"
+                onClick={() => setViewMode("list")}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                  viewMode === "list"
+                    ? "bg-purple-600 text-white"
+                    : "text-white/50 hover:text-white"
                 }`}
               >
-                {cls}
+                <Icon name="List" size={15} />
+                По урокам
               </button>
-            ))}
+              <button
+                onClick={() => setViewMode("photo")}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                  viewMode === "photo"
+                    ? "bg-pink-600 text-white"
+                    : "text-white/50 hover:text-white"
+                }`}
+              >
+                <Icon name="Image" size={15} />
+                Фото
+              </button>
+            </div>
           </div>
         </div>
 
-        {/* Day selector */}
-        <div className="flex gap-2 mb-6 overflow-x-auto pb-2 animate-slide-up" style={{ animationDelay: "0.15s" }}>
-          {days.map((day, i) => (
-            <button
-              key={day}
-              onClick={() => setSelectedDay(day)}
-              className={`flex-shrink-0 px-5 py-3 rounded-xl text-sm font-semibold transition-all ${
-                selectedDay === day
-                  ? "bg-gradient-to-r from-pink-600 to-rose-600 text-white glow-pink"
-                  : "glass border border-white/10 text-white/60 hover:text-white"
-              }`}
-            >
-              <span className="block text-xs font-normal opacity-60 mb-0.5">
-                {["Пн", "Вт", "Ср", "Чт", "Пт"][i]}
-              </span>
-              {day}
-            </button>
-          ))}
-        </div>
-
-        {/* Schedule list */}
-        <div className="space-y-3 animate-slide-up" style={{ animationDelay: "0.2s" }}>
-          {currentSchedule.length > 0 ? (
-            currentSchedule.map((lesson, i) => (
-              <div
-                key={i}
-                className="glass rounded-2xl p-5 flex items-center gap-5 glass-hover"
-              >
-                <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center">
-                  <span className="font-display text-lg font-bold text-white/40">
-                    {i + 1}
-                  </span>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex flex-wrap items-center gap-2 mb-1">
-                    <span
-                      className={`px-3 py-1 rounded-lg text-sm font-semibold border ${getColor(lesson.subject)}`}
-                    >
-                      {lesson.subject}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-3 text-white/45 text-sm">
-                    <span className="flex items-center gap-1">
-                      <Icon name="User" size={12} />
-                      {lesson.teacher}
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <Icon name="MapPin" size={12} />
-                      Кабинет {lesson.room}
-                    </span>
-                  </div>
-                </div>
-                <div className="flex-shrink-0 text-white/30 text-xs">
-                  {["08:00", "08:50", "09:40", "10:40", "11:30", "12:20"][i] ?? ""}–
-                  {["08:45", "09:35", "10:25", "11:25", "12:15", "13:05"][i] ?? ""}
-                </div>
-              </div>
-            ))
-          ) : (
-            <div className="glass rounded-2xl p-12 text-center">
-              <Icon name="CalendarOff" size={40} className="text-white/20 mx-auto mb-3" />
-              <p className="text-white/40 text-sm">
-                Расписание для класса <strong>{selectedClass}</strong> на{" "}
-                <strong>{selectedDay}</strong> ещё не загружено
+        {/* Photo mode */}
+        {viewMode === "photo" && (
+          <div className="animate-slide-up space-y-4">
+            <div className="glass rounded-2xl p-6">
+              <h3 className="font-display text-xl font-bold text-white tracking-wide mb-1">
+                ОБЩЕЕ РАСПИСАНИЕ (ФОТО)
+              </h3>
+              <p className="text-white/45 text-sm mb-6">
+                Загрузите фотографию или скан расписания — оно будет видно всем ученикам
               </p>
-              <p className="text-white/25 text-xs mt-1">Обратитесь к администратору</p>
+
+              {uploadedPhoto ? (
+                <div className="space-y-4">
+                  <div className="rounded-2xl overflow-hidden border border-white/10">
+                    <img
+                      src={uploadedPhoto}
+                      alt="Расписание"
+                      className="w-full object-contain max-h-[70vh]"
+                    />
+                  </div>
+                  <div className="flex gap-3">
+                    <label className="cursor-pointer flex items-center gap-2 px-4 py-2.5 rounded-xl bg-purple-500/20 text-purple-400 border border-purple-500/30 text-sm font-medium hover:bg-purple-500/30 transition-all">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={handlePhotoUpload}
+                      />
+                      <Icon name="RefreshCw" size={14} />
+                      Заменить фото
+                    </label>
+                    <button
+                      onClick={() => setUploadedPhoto(null)}
+                      className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-red-500/20 text-red-400 border border-red-500/30 text-sm font-medium hover:bg-red-500/30 transition-all"
+                    >
+                      <Icon name="Trash2" size={14} />
+                      Удалить
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <label className="cursor-pointer block">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handlePhotoUpload}
+                  />
+                  <div className="border-2 border-dashed border-white/15 rounded-2xl p-12 text-center hover:border-purple-500/50 hover:bg-purple-500/5 transition-all group">
+                    <div className="w-16 h-16 rounded-2xl bg-purple-500/15 flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform">
+                      <Icon name="ImagePlus" size={28} className="text-purple-400" />
+                    </div>
+                    <p className="text-white/60 font-semibold mb-1">Нажмите, чтобы загрузить фото</p>
+                    <p className="text-white/30 text-sm">JPG, PNG, WEBP — до 10 МБ</p>
+                  </div>
+                </label>
+              )}
             </div>
-          )}
-        </div>
+
+            <div className="glass rounded-2xl p-4 flex items-center gap-3">
+              <Icon name="Info" size={16} className="text-cyan-400 flex-shrink-0" />
+              <p className="text-white/50 text-sm">
+                Это общее расписание видно всем посетителям сайта. Для загрузки файлов Excel используйте{" "}
+                <span className="text-purple-400">Админ-панель → Расписание</span>
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* List mode */}
+        {viewMode === "list" && (
+          <>
+            {/* Class selector */}
+            <div className="glass rounded-2xl p-4 mb-6 animate-slide-up" style={{ animationDelay: "0.1s" }}>
+              <div className="flex items-center gap-2 mb-3">
+                <Icon name="Users" size={14} className="text-white/50" />
+                <span className="text-white/50 text-sm font-medium">Класс</span>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {classes.map((cls) => (
+                  <button
+                    key={cls}
+                    onClick={() => setSelectedClass(cls)}
+                    className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
+                      selectedClass === cls
+                        ? "bg-gradient-to-r from-purple-600 to-violet-600 text-white glow-purple scale-105"
+                        : "glass border border-white/10 text-white/60 hover:text-white hover:border-white/25"
+                    }`}
+                  >
+                    {cls}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Day selector */}
+            <div className="flex gap-2 mb-6 overflow-x-auto pb-2 animate-slide-up" style={{ animationDelay: "0.15s" }}>
+              {days.map((day, i) => (
+                <button
+                  key={day}
+                  onClick={() => setSelectedDay(day)}
+                  className={`flex-shrink-0 px-5 py-3 rounded-xl text-sm font-semibold transition-all ${
+                    selectedDay === day
+                      ? "bg-gradient-to-r from-pink-600 to-rose-600 text-white glow-pink"
+                      : "glass border border-white/10 text-white/60 hover:text-white"
+                  }`}
+                >
+                  <span className="block text-xs font-normal opacity-60 mb-0.5">
+                    {["Пн", "Вт", "Ср", "Чт", "Пт"][i]}
+                  </span>
+                  {day}
+                </button>
+              ))}
+            </div>
+
+            {/* Schedule list */}
+            <div className="space-y-3 animate-slide-up" style={{ animationDelay: "0.2s" }}>
+              {currentSchedule.length > 0 ? (
+                currentSchedule.map((lesson, i) => (
+                  <div
+                    key={i}
+                    className="glass rounded-2xl p-5 flex items-center gap-5 glass-hover"
+                  >
+                    <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center">
+                      <span className="font-display text-lg font-bold text-white/40">
+                        {i + 1}
+                      </span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <span
+                        className={`px-3 py-1 rounded-lg text-sm font-semibold border ${getColor(lesson.subject)}`}
+                      >
+                        {lesson.subject}
+                      </span>
+                      <div className="flex items-center gap-1 text-white/40 text-sm mt-2">
+                        <Icon name="MapPin" size={12} />
+                        Кабинет {lesson.room}
+                      </div>
+                    </div>
+                    <div className="flex-shrink-0 text-white/30 text-xs">
+                      {["08:00", "08:50", "09:40", "10:40", "11:30", "12:20"][i] ?? ""}–
+                      {["08:45", "09:35", "10:25", "11:25", "12:15", "13:05"][i] ?? ""}
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="glass rounded-2xl p-12 text-center">
+                  <Icon name="CalendarOff" size={40} className="text-white/20 mx-auto mb-3" />
+                  <p className="text-white/40 text-sm">
+                    Расписание для класса <strong>{selectedClass}</strong> на{" "}
+                    <strong>{selectedDay}</strong> ещё не загружено
+                  </p>
+                  <p className="text-white/25 text-xs mt-1">Обратитесь к администратору</p>
+                </div>
+              )}
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

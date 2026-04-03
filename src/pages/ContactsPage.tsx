@@ -1,6 +1,6 @@
 import Icon from "@/components/ui/icon";
 
-const contacts = [
+const contacts: { icon: string; label: string; value: string; color: string; glow: string; link?: string }[] = [
   {
     icon: "Phone",
     label: "Приёмная директора",
@@ -28,6 +28,14 @@ const contacts = [
     value: "г. Москва, ул. Школьная, д. 1",
     color: "from-amber-600 to-orange-600",
     glow: "",
+  },
+  {
+    icon: "Send",
+    label: "Telegram администратора",
+    value: "@Germann12_21",
+    color: "from-cyan-600 to-teal-600",
+    glow: "glow-cyan",
+    link: "https://t.me/Germann12_21",
   },
 ];
 
@@ -78,7 +86,7 @@ export default function ContactsPage() {
               КОНТАКТЫ
             </h1>
           </div>
-          <p className="text-white/50">МАОУ «Средняя общеобразовательная школа №1»</p>
+          <p className="text-white/50">МАОУ «Средняя общеобразовательная школа №4»</p>
         </div>
 
         <div className="grid lg:grid-cols-3 gap-6">
@@ -86,21 +94,44 @@ export default function ContactsPage() {
           <div className="lg:col-span-2 space-y-6">
             {/* Contact cards */}
             <div className="grid sm:grid-cols-2 gap-4">
-              {contacts.map((c, i) => (
-                <div
-                  key={i}
-                  className="glass rounded-2xl p-5 glass-hover animate-slide-up"
-                  style={{ animationDelay: `${i * 0.07}s` }}
-                >
-                  <div
-                    className={`w-10 h-10 rounded-xl bg-gradient-to-br ${c.color} flex items-center justify-center mb-3 ${c.glow}`}
+              {contacts.map((c, i) => {
+                const inner = (
+                  <>
+                    <div
+                      className={`w-10 h-10 rounded-xl bg-gradient-to-br ${c.color} flex items-center justify-center mb-3 ${c.glow}`}
+                    >
+                      <Icon name={c.icon} size={18} className="text-white" />
+                    </div>
+                    <p className="text-white/45 text-xs mb-1">{c.label}</p>
+                    <p className="text-white font-semibold">{c.value}</p>
+                    {c.link && (
+                      <p className="text-cyan-400 text-xs mt-1 flex items-center gap-1">
+                        <Icon name="ExternalLink" size={10} /> Написать
+                      </p>
+                    )}
+                  </>
+                );
+                return c.link ? (
+                  <a
+                    key={i}
+                    href={c.link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="glass rounded-2xl p-5 glass-hover animate-slide-up block"
+                    style={{ animationDelay: `${i * 0.07}s` }}
                   >
-                    <Icon name={c.icon} size={18} className="text-white" />
+                    {inner}
+                  </a>
+                ) : (
+                  <div
+                    key={i}
+                    className="glass rounded-2xl p-5 glass-hover animate-slide-up"
+                    style={{ animationDelay: `${i * 0.07}s` }}
+                  >
+                    {inner}
                   </div>
-                  <p className="text-white/45 text-xs mb-1">{c.label}</p>
-                  <p className="text-white font-semibold">{c.value}</p>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             {/* Staff */}
@@ -188,6 +219,24 @@ export default function ContactsPage() {
                 </button>
               </div>
             </div>
+
+            {/* Telegram button */}
+            <a
+              href="https://t.me/Schedule_Lessons4_LSK"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="glass rounded-2xl p-5 flex items-center gap-4 glass-hover animate-slide-up border border-cyan-500/25 block"
+              style={{ animationDelay: "0.27s" }}
+            >
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-cyan-600 to-teal-600 flex items-center justify-center flex-shrink-0 glow-cyan">
+                <Icon name="Send" size={22} className="text-white" />
+              </div>
+              <div>
+                <p className="text-white font-semibold">Мы в телеграме</p>
+                <p className="text-cyan-400 text-sm">@Schedule_Lessons4_LSK</p>
+              </div>
+              <Icon name="ArrowRight" size={18} className="text-white/30 ml-auto" />
+            </a>
 
             {/* Quick contact */}
             <div

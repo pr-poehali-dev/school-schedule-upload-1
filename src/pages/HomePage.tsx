@@ -57,9 +57,9 @@ export default function HomePage({ onNavigate }: HomePageProps) {
             className="font-display text-5xl sm:text-7xl font-bold mb-6 leading-tight tracking-wide"
             style={{ animationDelay: "0.1s" }}
           >
-            <span className="text-white">ШКОЛА</span>
+            <span className="text-white">РАСПИСАНИЕ УРОКОВ</span>
             <br />
-            <span className="gradient-text">РАСПИСАНИЕ</span>
+            <span className="gradient-text">ШКОЛА №4</span>
           </h1>
 
           <p
@@ -86,6 +86,15 @@ export default function HomePage({ onNavigate }: HomePageProps) {
             >
               Последние объявления
             </button>
+            <a
+              href="https://t.me/Schedule_Lessons4_LSK"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-center gap-2 px-8 py-4 rounded-xl bg-gradient-to-r from-cyan-600 to-teal-600 text-white font-semibold text-base hover:opacity-90 transition-all hover:scale-105 glow-cyan"
+            >
+              <Icon name="Send" size={18} />
+              Мы в телеграме
+            </a>
           </div>
         </div>
       </section>
